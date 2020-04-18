@@ -1,7 +1,9 @@
 use crate::action::*;
 use crate::agent::AgentManager;
+use crate::display::Display;
 use crate::grid::Grid;
 
+use piston::input::RenderEvent;
 pub struct Engine {
     /// 2D grid, which is used for collision detection and 'tagging'
     grid: Grid,
@@ -9,33 +11,50 @@ pub struct Engine {
     ac: ActionContext,
     /// All agents and agent context and stats
     am: AgentManager,
+    display: Option<Display>,
+    show_graphics: bool,
     step_counter: usize,
 }
 
 impl Engine {
-    pub fn new(grid: Grid, ac: ActionContext, am: AgentManager) -> Engine {
+    pub fn new(grid: Grid, ac: ActionContext, am: AgentManager, show_graphics: bool) -> Engine {
+        let mut display: Option<Display> = None;
+        if show_graphics {
+            display = Some(Display::new());
+        }
         Engine {
             grid,
             ac,
             am,
+            display,
+            show_graphics,
             step_counter: 0,
         }
     }
 
-    pub fn step(&mut self) {
-        for id in self.am.get_ids() {
-            self.am
-                .update_preference(id, &self.ac.get_mean_preferences());
-            let vec = self.am.get_actions_ordering(id);
-            let maybe_effect: Option<Effect> =
-                self.ac
-                    .maybe_get_allowed_effect(vec, id, &mut self.am, &mut self.grid);
-            if let Some(effect) = maybe_effect {
-                effect(id, &mut self.am, &mut self.grid);
-            }
-        }
+    fn update(&mut self) {
+        self.am.perform_actions(&self.grid, &self.ac);
         self.grid.update(self.am.flush_log());
         self.step_counter += 1;
+    }
+
+    pub fn step(&mut self) {
+        if self.show_graphics {
+            let display: &mut Display = self.display.as_mut().unwrap();
+            let maybe_e = display.events.next(&mut display.window);
+            if maybe_e.is_some() {
+                self.update();
+                let e = maybe_e.unwrap();
+                let render_objects = self.am.get_render_info();
+                let display: &mut Display = self.display.as_mut().unwrap();
+
+                if let Some(args) = e.render_args() {
+                    display.graphics.render(&args, &render_objects);
+                }
+            }
+        } else {
+            self.update();
+        }
     }
 
     pub fn stats(&mut self) {

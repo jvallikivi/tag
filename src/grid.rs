@@ -46,7 +46,7 @@ impl Grid {
     }
 
     pub fn is_subgrid_free(
-        &mut self,
+        &self,
         position: Position,
         subgrid_size_x: usize,
         subgrid_size_y: usize,
@@ -59,14 +59,14 @@ impl Grid {
             subgrid_size_x,
             subgrid_size_y,
             excluded_ids,
-            &mut self.val,
+            &self.val,
         )
         .next();
         maybe_occupier.is_none()
     }
 
     pub fn is_subgrid_occupied(
-        &mut self,
+        &self,
         position: Position,
         subgrid_size_x: usize,
         subgrid_size_y: usize,
@@ -79,14 +79,14 @@ impl Grid {
             subgrid_size_x,
             subgrid_size_y,
             excluded_ids,
-            &mut self.val,
+            &self.val,
         )
         .next();
         maybe_occupier.is_some()
     }
 
     pub fn get_subgrid_occupiers(
-        &mut self,
+        &self,
         position: Position,
         subgrid_size_x: usize,
         subgrid_size_y: usize,
@@ -99,7 +99,7 @@ impl Grid {
             subgrid_size_x,
             subgrid_size_y,
             excluded_ids,
-            &mut self.val,
+            &self.val,
         );
         occupier_iter.collect()
     }

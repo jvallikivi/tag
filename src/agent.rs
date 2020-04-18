@@ -1,10 +1,8 @@
-use crate::AGENT_NUM_UPPER_BOUND;
-use crate::STEP_SG_SIDE;
+use crate::{AGENT_NUM_UPPER_BOUND, STEP_SG_SIDE};
 
 use crate::action::*;
-use crate::grid::Grid;
-use crate::grid::Position;
-use crate::grid::PositionChange;
+use crate::display::RenderObject;
+use crate::grid::{Grid, Position, PositionChange};
 
 use rand::Rng;
 use std::collections::HashMap;
@@ -95,6 +93,17 @@ impl AgentManager {
         }
     }
 
+    pub fn perform_actions(&mut self, grid: &Grid, ac: &ActionContext) {
+        for id in self.get_ids() {
+            self.update_preference(id, ac.get_mean_preferences());
+            let vec = self.get_actions_ordering(id);
+            let maybe_effect: Option<Effect> = ac.maybe_get_allowed_effect(vec, id, self, grid);
+            if let Some(effect) = maybe_effect {
+                effect(id, self, grid);
+            }
+        }
+    }
+
     pub fn get_num_agents(&mut self) -> usize {
         self.agents.len()
     }
@@ -129,7 +138,7 @@ impl AgentManager {
         self.get(id).pref[rand_ix] *= rand_val;
 
         rand_ix = self.rng.gen_range(0, action_count);
-        if self.rng.gen::<f32>() < 0.01 * mean_preferences[rand_ix] {
+        if self.rng.gen::<f32>() < 0.02 * mean_preferences[rand_ix] {
             self.get(id).pref[rand_ix] = mean_preferences[rand_ix];
         }
     }
@@ -174,6 +183,14 @@ impl AgentManager {
 
     pub fn flush_log(&mut self) -> Vec<PositionChange> {
         self.position_log.drain(..).collect()
+    }
+
+    pub fn get_render_info(&mut self) -> Vec<RenderObject> {
+        let mut v: Vec<RenderObject> = vec![];
+        for agent in &self.agents {
+            v.push((agent.position, agent.is_it));
+        }
+        v
     }
 
     fn rand_pos(&mut self, grid: &mut Grid) -> Option<Position> {

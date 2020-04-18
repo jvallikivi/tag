@@ -1,16 +1,12 @@
-use crate::agent::AgentManager;
-use crate::agent::Id;
-use crate::grid::Grid;
-use crate::grid::Position;
+use crate::{MAP_SIDE, STEP_SG_SIDE, TAG_SG_SIDE};
 
-use crate::MAP_SIDE;
-use crate::STEP_SG_SIDE;
-use crate::TAG_SG_SIDE;
+use crate::agent::{AgentManager, Id};
+use crate::grid::{Grid, Position};
 
 use rand::seq::SliceRandom;
 
-pub type Precondition = fn(Id, &mut AgentManager, &mut Grid) -> bool;
-pub type Effect = fn(Id, &mut AgentManager, &mut Grid);
+pub type Precondition = fn(Id, &mut AgentManager, &Grid) -> bool;
+pub type Effect = fn(Id, &mut AgentManager, &Grid);
 
 pub struct Action {
     pub precond: Precondition,
@@ -33,11 +29,11 @@ impl ActionContext {
     }
 
     pub fn maybe_get_allowed_effect(
-        &mut self,
+        &self,
         preferences: Vec<usize>,
         id: Id,
         am: &mut AgentManager,
-        grid: &mut Grid,
+        grid: &Grid,
     ) -> Option<Effect> {
         for j in 0..self.actions.len() {
             let action: &Action = &self.actions[preferences[j]];
