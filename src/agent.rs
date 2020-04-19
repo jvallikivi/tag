@@ -4,11 +4,14 @@ use crate::action::*;
 use crate::display::RenderObject;
 use crate::grid::{Grid, Position, PositionChange};
 
-use rand::Rng;
+use rand::rngs::StdRng;
+use rand::{Rng, SeedableRng};
+use rayon::prelude::*;
 use std::collections::HashMap;
 
 pub type Id = u32;
 
+#[derive(Clone)]
 struct Agent {
     /// Id for an agent
     id: Id,
@@ -20,6 +23,8 @@ struct Agent {
     tagged_by: Option<u32>,
     /// Preferences on action choice
     pref: Vec<f32>,
+    /// Next action, used for concurrency
+    next_action: Option<Effect>,
 }
 
 pub struct AgentManager {
@@ -35,7 +40,7 @@ pub struct AgentManager {
     action_count: usize,
     /// Number of times the 'Tag' action has been used
     tagged_count: usize,
-    rng: rand::prelude::ThreadRng,
+    rng: StdRng,
 }
 
 impl AgentManager {
@@ -45,7 +50,7 @@ impl AgentManager {
         num_agents: usize,
         num_it: usize,
     ) -> AgentManager {
-        let rng = rand::thread_rng();
+        let rng = rand::rngs::StdRng::from_entropy();
         let action_count = ac.action_count;
         let mut am = AgentManager {
             agents: vec![],
@@ -83,6 +88,7 @@ impl AgentManager {
                 is_it,
                 tagged_by,
                 pref,
+                next_action: None,
             });
             grid.set(position, id);
         } else {
@@ -94,6 +100,7 @@ impl AgentManager {
                     is_it,
                     tagged_by,
                     pref,
+                    next_action: None,
                 });
                 grid.set(position, id);
             } else {
@@ -103,48 +110,23 @@ impl AgentManager {
     }
 
     pub fn perform_actions(&mut self, grid: &Grid, ac: &ActionContext) {
-        for id in self.get_ids() {
-            self.update_preference(id, ac.get_mean_preferences());
-            let vec = self.get_actions_ordering(id);
-            let maybe_effect: Option<Effect> = ac.maybe_get_allowed_effect(vec, id, &*self, grid);
-            if let Some(effect) = maybe_effect {
-                effect(id, self, grid);
-            }
-        }
-    }
-
-    fn get_ids(&mut self) -> Vec<Id> {
-        (0..self.agents.len())
-            .map(|i| self.agents[i].id)
-            .collect::<Vec<Id>>()
-    }
-
-    fn get_actions_ordering(&mut self, id: Id) -> Vec<usize> {
-        let pref: &Vec<f32> = &self.get_mut(id).pref;
-        let mut vals: Vec<f32> = pref.clone();
-        for i in 0..vals.len() {
-            vals[i] *= self.rng.gen::<f32>();
-        }
-        let mut ordering: Vec<(usize, &f32)> = (0 as usize..).zip(vals.iter()).collect();
-        ordering.sort_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap());
-        let ix: Vec<usize> = ordering
-            .iter()
-            .map(|(i, _)| i.clone())
-            .collect::<Vec<usize>>();
-        ix
-    }
-
-    fn update_preference(&mut self, id: Id, mean_preferences: &Vec<f32>) {
-        // Over time, acts similarly to a mean reverting walk
+        let mean_preferences = ac.get_mean_preferences();
         let action_count = self.action_count;
-        let mut rand_ix: usize = self.rng.gen_range(0, action_count);
-        let rm: f32 = 1.3;
-        let rand_val: f32 = self.rng.gen_range(1.0 / rm, rm);
-        self.get_mut(id).pref[rand_ix] *= rand_val;
-
-        rand_ix = self.rng.gen_range(0, action_count);
-        if self.rng.gen::<f32>() < 0.02 * mean_preferences[rand_ix] {
-            self.get_mut(id).pref[rand_ix] = mean_preferences[rand_ix];
+        let s = &*self;
+        let mut agents = self.agents.clone();
+        let v = move |agent: &mut Agent| {
+            let mut rng = rand::thread_rng();
+            AgentManager::update_preference(agent, mean_preferences, action_count, &mut rng);
+            let ordering = &*AgentManager::get_actions_ordering(agent, &mut rng);
+            agent.next_action = ac.maybe_get_allowed_effect(ordering, agent.id, s, grid);
+        };
+        agents.par_iter_mut().for_each(|agent| v(agent));
+        self.agents = agents;
+        for i in 0..self.agents.len() {
+            let agent = &self.agents[i];
+            if let Some(effect) = agent.next_action {
+                effect(agent.id, self, grid);
+            }
         }
     }
 
@@ -212,7 +194,7 @@ impl AgentManager {
     }
 
     fn new_id(&mut self) -> Id {
-        let mut rng = self.rng;
+        let rng = &mut self.rng;
         let mut id: Id = rng.gen_range(1, Id::max_value());
         while self.id_map.contains_key(&id) {
             id = rng.gen_range(1, Id::max_value());
@@ -228,5 +210,38 @@ impl AgentManager {
     fn get(&self, id: Id) -> &Agent {
         let index: usize = *self.id_map.get(&id).unwrap();
         &self.agents[index]
+    }
+
+    fn update_preference(
+        agent: &mut Agent,
+        mean_preferences: &Vec<f32>,
+        action_count: usize,
+        rng: &mut rand::prelude::ThreadRng,
+    ) {
+        let mut rand_ix: usize = rng.gen_range(0, action_count);
+        let rm: f32 = 1.5;
+        let rand_val: f32 = rng.gen_range(1.0 / rm, rm);
+        agent.pref[rand_ix] *= rand_val;
+
+        rand_ix = rng.gen_range(0, action_count);
+        if rng.gen::<f32>() < 0.02 * mean_preferences[rand_ix] {
+            agent.pref[rand_ix] = mean_preferences[rand_ix];
+        }
+    }
+
+    fn get_actions_ordering(agent: &mut Agent, rng: &mut rand::prelude::ThreadRng) -> Vec<usize> {
+        let pref: &Vec<f32> = &agent.pref;
+        let mut vals: Vec<f32> = pref.clone();
+        // let min: f32 = vals.iter().fold(f64::INFINITY, |a, &b| a.min(b));
+        for i in 0..vals.len() {
+            vals[i] *= rng.gen::<f32>();
+        }
+        let mut ordering: Vec<(usize, &f32)> = (0 as usize..).zip(vals.iter()).collect();
+        ordering.sort_by(|(_, a), (_, b)| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
+        let ix: Vec<usize> = ordering
+            .iter()
+            .map(|(i, _)| i.clone())
+            .collect::<Vec<usize>>();
+        ix
     }
 }

@@ -1,5 +1,6 @@
 extern crate piston;
 extern crate rand;
+extern crate rayon;
 
 mod action;
 mod agent;
@@ -18,7 +19,7 @@ pub const WINDOW_SIDE: f64 = 720.0;
 pub const AGENT_NUM_UPPER_BOUND: usize = GRID_SIDE * GRID_SIDE / (STEP_SG_SIDE / STEP_SG_SIDE);
 pub const BODY_PIXEL_SIZE: usize = 15 * WINDOW_SIDE as usize / GRID_SIDE;
 
-//         Modify these values             //  
+//         Modify these values             //
 pub const USE_VIEWER: bool = true;
 pub const COLLSION_DETECTION: bool = true;
 pub const STEP_SG_SIDE: usize = 21;

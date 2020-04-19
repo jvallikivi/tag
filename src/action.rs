@@ -30,7 +30,7 @@ impl ActionContext {
 
     pub fn maybe_get_allowed_effect(
         &self,
-        actions_ordering: Vec<usize>,
+        actions_ordering: &[usize],
         id: Id,
         am: &AgentManager,
         grid: &Grid,
