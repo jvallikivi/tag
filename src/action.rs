@@ -212,6 +212,7 @@ impl ActionContext {
             );
             
             if let Some(target_id) = ids.choose(&mut am.rng) {
+                am.reset_last_untagged(id);
                 am.set_is_it(id, false);
                 am.set_is_it(*target_id, true);
                 am.set_tagged_by(id, None);

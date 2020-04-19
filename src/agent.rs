@@ -1,4 +1,4 @@
-use crate::{AGENT_NUM_UPPER_BOUND, STEP_SG_SIDE};
+use crate::{AGENT_NUM_UPPER_BOUND, STEP_SG_SIDE, LAST_UNTAGGED_DISPLAY_LENGTH};
 
 use crate::action::*;
 use crate::display::RenderObject;
@@ -25,6 +25,9 @@ struct Agent {
     pref: Vec<f32>,
     /// Next action, used for concurrency
     next_action: Option<Effect>,
+    /// Tells how many time steps ago the agent was tagged,
+    /// only used for visualisation 
+    last_un_tagged: usize,
 }
 
 pub struct AgentManager {
@@ -89,6 +92,7 @@ impl AgentManager {
                 tagged_by,
                 pref,
                 next_action: None,
+                last_un_tagged: LAST_UNTAGGED_DISPLAY_LENGTH + 1,
             });
             grid.set(position, id);
         } else {
@@ -101,6 +105,7 @@ impl AgentManager {
                     tagged_by,
                     pref,
                     next_action: None,
+                    last_un_tagged: LAST_UNTAGGED_DISPLAY_LENGTH + 1,
                 });
                 grid.set(position, id);
             } else {
@@ -123,7 +128,8 @@ impl AgentManager {
         agents.par_iter_mut().for_each(|agent| v(agent));
         self.agents = agents;
         for i in 0..self.agents.len() {
-            let agent = &self.agents[i];
+            let agent: &mut Agent = &mut self.agents[i];
+            agent.last_un_tagged += 1;
             if let Some(effect) = agent.next_action {
                 effect(agent.id, self, grid);
             }
@@ -168,6 +174,10 @@ impl AgentManager {
         self.tagged_count += 1;
     }
 
+    pub fn reset_last_untagged(&mut self, id: Id) {
+        self.get_mut(id).last_un_tagged = 0;
+    }
+
     pub fn flush_log(&mut self) -> Vec<PositionChange> {
         self.position_log.drain(..).collect()
     }
@@ -175,7 +185,7 @@ impl AgentManager {
     pub fn get_render_info(&mut self) -> Vec<RenderObject> {
         let mut v: Vec<RenderObject> = vec![];
         for agent in &self.agents {
-            v.push((agent.position, agent.is_it));
+            v.push((agent.position, agent.is_it, agent.last_un_tagged));
         }
         v
     }

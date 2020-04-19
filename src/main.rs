@@ -18,15 +18,17 @@ use std::time::Instant;
 pub const WINDOW_SIDE: f64 = 720.0;
 pub const AGENT_NUM_UPPER_BOUND: usize = GRID_SIDE * GRID_SIDE / (STEP_SG_SIDE / STEP_SG_SIDE);
 pub const BODY_PIXEL_SIZE: usize = 15 * WINDOW_SIDE as usize / GRID_SIDE;
+pub const LAST_UNTAGGED_DISPLAY_LENGTH: usize = 100;
+
 
 //         Modify these values             //
 pub const USE_VIEWER: bool = true;
 pub const COLLSION_DETECTION: bool = true;
 pub const STEP_SG_SIDE: usize = 21;
 pub const TAG_SG_SIDE: usize = 31;
-pub const GRID_SIDE: usize = 800;
+pub const GRID_SIDE: usize = 1000;
 pub const NUM_STEPS: usize = 20000;
-pub const NUM_AGENTS: usize = 500;
+pub const NUM_AGENTS: usize = 2000;
 pub const NUM_AGENTS_IT: usize = 2;
 //    More information in ../README.md     //
 

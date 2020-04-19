@@ -2,7 +2,7 @@ extern crate glutin_window;
 extern crate graphics;
 extern crate opengl_graphics;
 
-use crate::{BODY_PIXEL_SIZE, GRID_SIDE, WINDOW_SIDE};
+use crate::{BODY_PIXEL_SIZE, GRID_SIDE, WINDOW_SIDE, LAST_UNTAGGED_DISPLAY_LENGTH};
 
 use crate::grid::Position;
 
@@ -16,8 +16,9 @@ use piston::window::WindowSettings;
 const WHITE: [f32; 4] = [0.75, 0.75, 0.75, 1.0];
 const RED: [f32; 4] = [1.0, 0.0, 0.0, 0.8];
 const YELLOW: [f32; 4] = [1.0, 1.0, 0.0, 0.8];
+const ORANGE: [f32; 4] = [1.0, 0.5, 0.0, 0.8];
 
-pub type RenderObject = (Position, bool);
+pub type RenderObject = (Position, bool, usize);
 
 pub struct Graphics {
     gl: GlGraphics,
@@ -32,7 +33,7 @@ impl Graphics {
         self.gl.draw(args.viewport(), |c, gl| {
             clear(WHITE, gl);
             for obj in objects {
-                let color = if obj.1 { RED } else { YELLOW };
+                let color = if obj.1 { RED } else { if obj.2 > LAST_UNTAGGED_DISPLAY_LENGTH {YELLOW} else {ORANGE}};
                 let transform = c
                     .transform
                     .trans(obj.0.x as f64 * scale, obj.0.y as f64 * scale);
