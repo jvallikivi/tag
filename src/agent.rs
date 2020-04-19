@@ -39,20 +39,29 @@ pub struct AgentManager {
 }
 
 impl AgentManager {
-    pub fn new(ac: &ActionContext) -> AgentManager {
+    pub fn new(
+        ac: &ActionContext,
+        grid: &mut Grid,
+        num_agents: usize,
+        num_it: usize,
+    ) -> AgentManager {
         let rng = rand::thread_rng();
         let action_count = ac.action_count;
-        AgentManager {
+        let mut am = AgentManager {
             agents: vec![],
             id_map: HashMap::new(),
             position_log: vec![],
             action_count,
             tagged_count: 0,
             rng,
+        };
+        for i in 0..num_agents {
+            am.add_agent(i < num_it, None, None, grid);
         }
+        am
     }
 
-    pub fn add_agent(
+    fn add_agent(
         &mut self,
         is_it: bool,
         tagged_by: Option<u32>,
@@ -97,25 +106,21 @@ impl AgentManager {
         for id in self.get_ids() {
             self.update_preference(id, ac.get_mean_preferences());
             let vec = self.get_actions_ordering(id);
-            let maybe_effect: Option<Effect> = ac.maybe_get_allowed_effect(vec, id, self, grid);
+            let maybe_effect: Option<Effect> = ac.maybe_get_allowed_effect(vec, id, &*self, grid);
             if let Some(effect) = maybe_effect {
                 effect(id, self, grid);
             }
         }
     }
 
-    pub fn get_num_agents(&mut self) -> usize {
-        self.agents.len()
-    }
-
-    pub fn get_ids(&mut self) -> Vec<Id> {
+    fn get_ids(&mut self) -> Vec<Id> {
         (0..self.agents.len())
             .map(|i| self.agents[i].id)
             .collect::<Vec<Id>>()
     }
 
-    pub fn get_actions_ordering(&mut self, id: Id) -> Vec<usize> {
-        let pref: &Vec<f32> = &self.get(id).pref;
+    fn get_actions_ordering(&mut self, id: Id) -> Vec<usize> {
+        let pref: &Vec<f32> = &self.get_mut(id).pref;
         let mut vals: Vec<f32> = pref.clone();
         for i in 0..vals.len() {
             vals[i] *= self.rng.gen::<f32>();
@@ -129,51 +134,51 @@ impl AgentManager {
         ix
     }
 
-    pub fn update_preference(&mut self, id: Id, mean_preferences: &Vec<f32>) {
+    fn update_preference(&mut self, id: Id, mean_preferences: &Vec<f32>) {
         // Over time, acts similarly to a mean reverting walk
         let action_count = self.action_count;
         let mut rand_ix: usize = self.rng.gen_range(0, action_count);
         let rm: f32 = 1.3;
         let rand_val: f32 = self.rng.gen_range(1.0 / rm, rm);
-        self.get(id).pref[rand_ix] *= rand_val;
+        self.get_mut(id).pref[rand_ix] *= rand_val;
 
         rand_ix = self.rng.gen_range(0, action_count);
         if self.rng.gen::<f32>() < 0.02 * mean_preferences[rand_ix] {
-            self.get(id).pref[rand_ix] = mean_preferences[rand_ix];
+            self.get_mut(id).pref[rand_ix] = mean_preferences[rand_ix];
         }
     }
 
-    pub fn get_position(&mut self, id: Id) -> Position {
+    pub fn get_position(&self, id: Id) -> Position {
         self.get(id).position
     }
 
     pub fn set_position(&mut self, id: Id, position: Position) {
-        let before = self.get(id).position;
+        let before = self.get_mut(id).position;
         self.position_log.push(PositionChange {
             id,
             before: before.clone(),
             after: position.clone(),
         });
-        self.get(id).position = position;
+        self.get_mut(id).position = position;
     }
 
-    pub fn get_is_it(&mut self, id: Id) -> bool {
+    pub fn get_is_it(&self, id: Id) -> bool {
         self.get(id).is_it
     }
 
     pub fn set_is_it(&mut self, id: Id, is_it: bool) {
-        self.get(id).is_it = is_it;
+        self.get_mut(id).is_it = is_it;
     }
 
-    pub fn maybe_get_tagged_by(&mut self, id: Id) -> Option<Id> {
+    pub fn maybe_get_tagged_by(&self, id: Id) -> Option<Id> {
         self.get(id).tagged_by
     }
 
     pub fn set_tagged_by(&mut self, id: Id, tagged_by: Option<Id>) {
-        self.get(id).tagged_by = tagged_by;
+        self.get_mut(id).tagged_by = tagged_by;
     }
 
-    pub fn get_tagged_count(&mut self) -> usize {
+    pub fn get_tagged_count(&self) -> usize {
         self.tagged_count
     }
 
@@ -196,7 +201,7 @@ impl AgentManager {
     fn rand_pos(&mut self, grid: &mut Grid) -> Option<Position> {
         let mut rand_pos: Position = Position::random();
         let mut c: usize = 0;
-        while !grid.is_subgrid_free(rand_pos, STEP_SG_SIDE, STEP_SG_SIDE, vec![]) {
+        while !grid.is_subgrid_free(rand_pos, STEP_SG_SIDE, STEP_SG_SIDE, vec![], None) {
             if c > 500 {
                 return None;
             }
@@ -215,8 +220,13 @@ impl AgentManager {
         id
     }
 
-    fn get(&mut self, id: Id) -> &mut Agent {
+    fn get_mut(&mut self, id: Id) -> &mut Agent {
         let index: usize = *self.id_map.get(&id).unwrap();
         &mut self.agents[index]
+    }
+
+    fn get(&self, id: Id) -> &Agent {
+        let index: usize = *self.id_map.get(&id).unwrap();
+        &self.agents[index]
     }
 }

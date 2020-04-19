@@ -1,4 +1,4 @@
-use crate::MAP_SIDE;
+use crate::GRID_SIDE;
 
 use crate::agent::Id;
 use crate::rand::Rng;
@@ -15,8 +15,8 @@ impl Position {
     pub fn random() -> Position {
         let mut rng = rand::thread_rng();
         Position {
-            x: rng.gen_range(0, MAP_SIDE),
-            y: rng.gen_range(0, MAP_SIDE),
+            x: rng.gen_range(0, GRID_SIDE),
+            y: rng.gen_range(0, GRID_SIDE),
         }
     }
 }
@@ -51,18 +51,28 @@ impl Grid {
         subgrid_size_x: usize,
         subgrid_size_y: usize,
         excluded_ids: Vec<Id>,
+        maybe_excluded_fn: Option<&dyn Fn(Id) -> bool>,
     ) -> bool {
         let subgrid_center: Position = self.get_subgrid_center(subgrid_size_x, subgrid_size_y);
-        let maybe_occupier: Option<Id> = SubgridSearch::new(
+        let mut occupier_iter: SubgridSearch = SubgridSearch::new(
             position,
             subgrid_center,
             subgrid_size_x,
             subgrid_size_y,
             excluded_ids,
             &self.val,
-        )
-        .next();
-        maybe_occupier.is_none()
+        );
+
+        if let Some(excluded_fn) = maybe_excluded_fn {
+            while let Some(occupier) = occupier_iter.next() {
+                if !excluded_fn(occupier) {
+                    return false;
+                }
+            }
+            return true;
+        } else {
+            return occupier_iter.next().is_none();
+        }
     }
 
     pub fn is_subgrid_occupied(
@@ -71,18 +81,28 @@ impl Grid {
         subgrid_size_x: usize,
         subgrid_size_y: usize,
         excluded_ids: Vec<Id>,
+        maybe_excluded_fn: Option<&dyn Fn(Id) -> bool>,
     ) -> bool {
         let subgrid_center: Position = self.get_subgrid_center(subgrid_size_x, subgrid_size_y);
-        let maybe_occupier: Option<Id> = SubgridSearch::new(
+        let mut occupier_iter: SubgridSearch = SubgridSearch::new(
             position,
             subgrid_center,
             subgrid_size_x,
             subgrid_size_y,
             excluded_ids,
             &self.val,
-        )
-        .next();
-        maybe_occupier.is_some()
+        );
+
+        if let Some(excluded_fn) = maybe_excluded_fn {
+            while let Some(occupier) = occupier_iter.next() {
+                if !excluded_fn(occupier) {
+                    return true;
+                }
+            }
+            return false;
+        } else {
+            occupier_iter.next().is_some()
+        }
     }
 
     pub fn get_subgrid_occupiers(
@@ -91,9 +111,10 @@ impl Grid {
         subgrid_size_x: usize,
         subgrid_size_y: usize,
         excluded_ids: Vec<Id>,
+        maybe_excluded_fn: Option<&dyn Fn(Id) -> bool>,
     ) -> Vec<Id> {
         let subgrid_center: Position = self.get_subgrid_center(subgrid_size_x, subgrid_size_y);
-        let occupier_iter: SubgridSearch = SubgridSearch::new(
+        let mut occupier_iter: SubgridSearch = SubgridSearch::new(
             position,
             subgrid_center,
             subgrid_size_x,
@@ -101,7 +122,18 @@ impl Grid {
             excluded_ids,
             &self.val,
         );
-        occupier_iter.collect()
+
+        if let Some(excluded_fn) = maybe_excluded_fn {
+            let mut v: Vec<Id> = vec![];
+            while let Some(occupier) = occupier_iter.next() {
+                if !excluded_fn(occupier) {
+                    v.push(occupier);
+                }
+            }
+            v
+        } else {
+            occupier_iter.collect()
+        }
     }
 
     fn get_subgrid_center(&self, subgrid_size_x: usize, subgrid_size_y: usize) -> Position {
@@ -136,8 +168,8 @@ impl<'a> SubgridSearch<'a> {
         let x_start = cmp::max(x, 0) as usize;
         let y_start = cmp::max(y, 0) as usize;
         let y_start_ = y_start;
-        let x_end = cmp::min(subgrid_size_x as i64 + x, MAP_SIDE as i64) as usize;
-        let y_end = cmp::min(subgrid_size_y as i64 + y, MAP_SIDE as i64) as usize;
+        let x_end = cmp::min(subgrid_size_x as i64 + x, GRID_SIDE as i64) as usize;
+        let y_end = cmp::min(subgrid_size_y as i64 + y, GRID_SIDE as i64) as usize;
         SubgridSearch {
             x_start,
             y_start,

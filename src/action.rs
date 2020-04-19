@@ -1,11 +1,11 @@
-use crate::{MAP_SIDE, STEP_SG_SIDE, TAG_SG_SIDE};
+use crate::{COLLSION_DETECTION, GRID_SIDE, STEP_SG_SIDE, TAG_SG_SIDE};
 
 use crate::agent::{AgentManager, Id};
 use crate::grid::{Grid, Position};
 
 use rand::seq::SliceRandom;
 
-pub type Precondition = fn(Id, &mut AgentManager, &Grid) -> bool;
+pub type Precondition = fn(Id, &AgentManager, &Grid) -> bool;
 pub type Effect = fn(Id, &mut AgentManager, &Grid);
 
 pub struct Action {
@@ -30,13 +30,13 @@ impl ActionContext {
 
     pub fn maybe_get_allowed_effect(
         &self,
-        preferences: Vec<usize>,
+        actions_ordering: Vec<usize>,
         id: Id,
-        am: &mut AgentManager,
+        am: &AgentManager,
         grid: &Grid,
     ) -> Option<Effect> {
         for j in 0..self.actions.len() {
-            let action: &Action = &self.actions[preferences[j]];
+            let action: &Action = &self.actions[actions_ordering[j]];
             let action_allowed = (action.precond)(id, am, grid);
             if action_allowed {
                 return Some(action.effect);
@@ -51,15 +51,20 @@ impl ActionContext {
             if position.x == 0 {
                 return false;
             }
-            grid.is_subgrid_free(
-                Position {
-                    x: position.x - 1,
-                    y: position.y,
-                },
-                STEP_SG_SIDE,
-                STEP_SG_SIDE,
-                vec![id],
-            )
+            if COLLSION_DETECTION {
+                grid.is_subgrid_free(
+                    Position {
+                        x: position.x - 1,
+                        y: position.y,
+                    },
+                    STEP_SG_SIDE,
+                    STEP_SG_SIDE,
+                    vec![id],
+                    None,
+                )
+            } else {
+                true
+            }
         };
         let left_step_effect: Effect = |id, am, _| {
             let mut position = am.get_position(id);
@@ -73,18 +78,23 @@ impl ActionContext {
 
         let right_step_precond: Precondition = |id, am, grid| {
             let position = am.get_position(id);
-            if position.x == MAP_SIDE - 1 {
+            if position.x == GRID_SIDE - 1 {
                 return false;
             }
-            grid.is_subgrid_free(
-                Position {
-                    x: position.x + 1,
-                    y: position.y,
-                },
-                STEP_SG_SIDE,
-                STEP_SG_SIDE,
-                vec![id],
-            )
+            if COLLSION_DETECTION {
+                grid.is_subgrid_free(
+                    Position {
+                        x: position.x + 1,
+                        y: position.y,
+                    },
+                    STEP_SG_SIDE,
+                    STEP_SG_SIDE,
+                    vec![id],
+                    None,
+                )
+            } else {
+                true
+            }
         };
         let right_step_effect: Effect = |id, am, _| {
             let mut position = am.get_position(id);
@@ -101,15 +111,20 @@ impl ActionContext {
             if position.y == 0 {
                 return false;
             }
-            grid.is_subgrid_free(
-                Position {
-                    x: position.x,
-                    y: position.y - 1,
-                },
-                STEP_SG_SIDE,
-                STEP_SG_SIDE,
-                vec![id],
-            )
+            if COLLSION_DETECTION {
+                grid.is_subgrid_free(
+                    Position {
+                        x: position.x,
+                        y: position.y - 1,
+                    },
+                    STEP_SG_SIDE,
+                    STEP_SG_SIDE,
+                    vec![id],
+                    None,
+                )
+            } else {
+                true
+            }
         };
         let up_step_effect: Effect = |id, am, _| {
             let mut position = am.get_position(id);
@@ -123,18 +138,23 @@ impl ActionContext {
 
         let down_step_precond: Precondition = |id, am, grid| {
             let position = am.get_position(id);
-            if position.y == MAP_SIDE - 1 {
+            if position.y == GRID_SIDE - 1 {
                 return false;
             }
-            grid.is_subgrid_free(
-                Position {
-                    x: position.x,
-                    y: position.y + 1,
-                },
-                STEP_SG_SIDE,
-                STEP_SG_SIDE,
-                vec![id],
-            )
+            if COLLSION_DETECTION {
+                grid.is_subgrid_free(
+                    Position {
+                        x: position.x,
+                        y: position.y + 1,
+                    },
+                    STEP_SG_SIDE,
+                    STEP_SG_SIDE,
+                    vec![id],
+                    None,
+                )
+            } else {
+                true
+            }
         };
         let down_step_effect: Effect = |id, am, _| {
             let mut position = am.get_position(id);
@@ -160,11 +180,15 @@ impl ActionContext {
                 if let Some(tagged_by) = maybe_tagged_by {
                     excluded_ids.push(tagged_by);
                 }
+                let am_immut = &*am;
+                let ignore_tagged = move |id: Id| am_immut.get_is_it(id);
+
                 grid.is_subgrid_occupied(
                     am.get_position(id),
                     TAG_SG_SIDE,
                     TAG_SG_SIDE,
                     excluded_ids,
+                    Some(&ignore_tagged),
                 )
             } else {
                 false
@@ -177,11 +201,14 @@ impl ActionContext {
             if let Some(tagged_by) = maybe_tagged_by {
                 excluded_ids.push(tagged_by);
             }
+            let am_immut = &*am;
+            let ignore_tagged = move |id: Id| am_immut.get_is_it(id);
             let ids: Vec<Id> = grid.get_subgrid_occupiers(
                 am.get_position(id),
                 TAG_SG_SIDE,
                 TAG_SG_SIDE,
                 excluded_ids,
+                Some(&ignore_tagged),
             );
             let target_id: Id = *ids.choose(&mut rand::thread_rng()).unwrap();
             am.set_is_it(id, false);

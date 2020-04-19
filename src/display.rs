@@ -2,7 +2,7 @@ extern crate glutin_window;
 extern crate graphics;
 extern crate opengl_graphics;
 
-use crate::{BODY_PIXEL_SIZE, MAP_SIDE, WINDOW_SIDE};
+use crate::{BODY_PIXEL_SIZE, GRID_SIDE, WINDOW_SIDE};
 
 use crate::grid::Position;
 
@@ -60,7 +60,7 @@ impl Display {
 
         let graphics = Graphics {
             gl: GlGraphics::new(opengl),
-            scale: WINDOW_SIDE / MAP_SIDE as f64,
+            scale: WINDOW_SIDE / GRID_SIDE as f64,
         };
 
         let settings = EventSettings {
