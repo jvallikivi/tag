@@ -210,12 +210,14 @@ impl ActionContext {
                 excluded_ids,
                 Some(&ignore_tagged),
             );
-            let target_id: Id = *ids.choose(&mut rand::thread_rng()).unwrap();
-            am.set_is_it(id, false);
-            am.set_is_it(target_id, true);
-            am.set_tagged_by(id, None);
-            am.set_tagged_by(target_id, Some(id));
-            am.increment_tagged();
+            
+            if let Some(target_id) = ids.choose(&mut am.rng) {
+                am.set_is_it(id, false);
+                am.set_is_it(*target_id, true);
+                am.set_tagged_by(id, None);
+                am.set_tagged_by(*target_id, Some(id));
+                am.increment_tagged();
+            }
         };
         let tag: Action = Action {
             precond: tag_precond,

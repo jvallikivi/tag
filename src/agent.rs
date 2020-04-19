@@ -40,7 +40,7 @@ pub struct AgentManager {
     action_count: usize,
     /// Number of times the 'Tag' action has been used
     tagged_count: usize,
-    rng: StdRng,
+    pub rng: StdRng,
 }
 
 impl AgentManager {

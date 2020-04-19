@@ -25,7 +25,7 @@ Every agent holds a weight (preference) for every possible action, which is corr
 <details>
   <summary>Show me how to add/modify an action!</summary>
 
-Feel free to add/modify actions in `ActionContext::new` in [./src/actions.rs](./src/action.rs), where the 6 existing actions are defined. Below is an example of an action that could be added which moves the agent left and up in one move. Make sure that the agents don't leave the grid!
+Feel free to add/modify actions in `ActionContext::new` in [./src/actions.rs](./src/action.rs), where the 6 existing actions are defined. Below is an example of an action that could be added which moves the agent left and up in one move. Make sure that the agents don't leave the grid! Take care of data races as the simulation runs on multiple threads. For example if two taggers show the intent of tagging the same untagged agent, running tag_effect may panic. 
 
 ```Rust
     pub fn new() -> ActionContext {
